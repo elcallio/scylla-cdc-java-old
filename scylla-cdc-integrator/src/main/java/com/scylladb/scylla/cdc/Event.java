@@ -8,6 +8,15 @@ import java.util.UUID;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.utils.UUIDs;
 
+/**
+ * A CDC event. Typically a set of change rows that represent one or more
+ * changes made to the original table in a single query.
+ * 
+ * Groups {@link RowImage} objects by timestamp
+ * 
+ * @author calle
+ *
+ */
 public class Event {
     private final UUID timeUUID;
     private List<RowImage> rows = new ArrayList<>();
@@ -34,6 +43,10 @@ public class Event {
 
     public Instant getTimestamp() {
         return Instant.ofEpochMilli(UUIDs.unixTimestamp(timeUUID));
+    }
+
+    public StreamPosition position() {
+        return new StreamPosition(getTimeUUID());
     }
 
     void addRow(LogSession session, Row r) {

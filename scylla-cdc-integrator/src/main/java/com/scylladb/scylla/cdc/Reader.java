@@ -30,6 +30,12 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.google.common.util.concurrent.FutureCallback;
 
+/**
+ * CDC log reader
+ * 
+ * @author calle
+ *
+ */
 public class Reader {
     private final Session session;
     private final LogSession logSession;
@@ -48,10 +54,28 @@ public class Reader {
                         quoteIfNecessary(logTable.getPkColumn().getName())));
     }
 
+    /**
+     * Creates a suitable stream limit position, based on now - stream
+     * confidence window in configuration.
+     * 
+     * @return
+     */
     public StreamPosition makeLimit() {
         return new StreamPosition(Instant.now().minus(logSession.getStreamPositionWindow()));
     }
 
+    /**
+     * Reads the provided streams and returns as a single {@link LogResult}
+     * 
+     * @param streams
+     *            streams to read. Must not be more than supported by "IN"
+     *            clause in cluster.
+     * @param pos
+     *            start position
+     * @param limit
+     *            end position
+     * @return pagable result of {@link Event}s
+     */
     public CompletableFuture<LogResult> readStreams(Collection<Stream> streams, StreamPosition pos,
             StreamPosition limit) {
         if (limit.compareTo(pos) <= 0) {
@@ -78,6 +102,25 @@ public class Reader {
         return res;
     }
 
+    /**
+     * Reads provided streams in paged and possibly concurrent fashion,
+     * segmented according to config limits, and calls the consumer for each
+     * event.
+     * 
+     * Events are guaranteed to be returned in timestamp order, which for every
+     * partition key in the original table will mean insertion order (as seen by
+     * server).
+     * 
+     * @param streams
+     *            streams to read
+     * @param pos
+     *            start position
+     * @param limit
+     *            end position
+     * @param consumer
+     *            callback for {@link Event}s
+     * @return
+     */
     public CompletableFuture<StreamPosition> readStreams(final Collection<Stream> streams, final StreamPosition pos,
             final StreamPosition limit, final Consumer<Event> consumer) {
         if (streams.size() > logSession.getMaxStreamsInQuery()) {
@@ -93,6 +136,12 @@ public class Reader {
         });
     }
 
+    /**
+     * Reads all streams valid for pos/limit and calls consumer.
+     * 
+     * @see Reader#readStreams(Collection, StreamPosition, StreamPosition,
+     *      Consumer)
+     */
     public CompletableFuture<StreamPosition> readAllStreams(StreamPosition pos, StreamPosition limit,
             final Consumer<Event> consumer) {
         SortedMap<Date, Set<Stream>> map = logSession.getStreams().streams(pos).stream()

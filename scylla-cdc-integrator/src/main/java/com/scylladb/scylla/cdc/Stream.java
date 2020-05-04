@@ -3,6 +3,12 @@ package com.scylladb.scylla.cdc;
 import java.nio.ByteBuffer;
 import java.util.Date;
 
+/**
+ * A single CDC stream
+ * 
+ * @author calle
+ *
+ */
 public class Stream {
     private final Date timestamp;
     private final ByteBuffer id;

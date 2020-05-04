@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -25,6 +24,19 @@ import com.datastax.driver.core.utils.UUIDs;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 
+/**
+ * Represents the available cdc streams in a scylla cluster. 
+ * 
+ * This includes both active and expired streams. Note that an 
+ * expired stream can still receive writes for a short time 
+ * after being replaced. Thus one must use a confidence interval
+ * in sifting out streams that are considered consumed.  
+ * 
+ * The stream set is updated on cluster topology changes.
+ *  
+ * @author calle
+ *
+ */
 public class Streams {
     private final Session session;
     private final PreparedStatement statement;
@@ -33,6 +45,8 @@ public class Streams {
         this.session = session;
         this.statement = session
                 .prepare("SELECT time, description, expired FROM system_distributed.cdc_topology_description");
+        
+        // listen for cluster changes. 
         session.getCluster().register(new Host.StateListener() {
 
             @Override
@@ -118,7 +132,14 @@ public class Streams {
         return f;
     }
 
-    public Collection<? extends Stream> streams(Date threshold) {
+    /**
+     * Sift out streams that has not expired prior to the 
+     * threshold time. 
+     *  
+     * @param threshold - watermark timestamp
+     * @return a list of streams (in ascending creation order)
+     */
+    public List<? extends Stream> streams(Date threshold) {
         return allStreams.values().stream().collect(ArrayList::new, (res, streams) -> {
             if (streams.isEmpty()) {
                 // should not happen, but...
@@ -131,21 +152,37 @@ public class Streams {
         }, ArrayList::addAll);
     }
 
-    public Collection<? extends Stream> streams() {
+    /**
+     * All streams since the beginning of time 
+     *  
+     * @param threshold - watermark timestamp
+     * @return a list of streams (in ascending creation order)
+     */
+    public List<? extends Stream> streams() {
         return streams(new Date(0));
     }
 
-    public Collection<? extends Stream> streams(Instant threshold) {
+    /** @see streams(Date) */
+    public List<? extends Stream> streams(Instant threshold) {
         return streams(Date.from(threshold));
     }
 
-    public Collection<? extends Stream> streams(StreamPosition pos) {
+    /** @see streams(Date) */
+    public List<? extends Stream> streams(StreamPosition pos) {
         return streams(Instant.ofEpochMilli(UUIDs.unixTimestamp(pos.getPosition())));
     }
 
-    public Collection<? extends Stream> streams(long newerThanDelta, TemporalUnit unit) {
+    /**
+     * Sift out streams that has not expired prior to <code>delta</code>
+     * units of time before now (wall clock) 
+     *  
+     * @param delta time units before now
+     * @param unit unit designator
+     * @return a list of streams (in ascending creation order)
+     */
+    public List<? extends Stream> streams(long delta, TemporalUnit unit) {
         Instant i = Instant.now();
-        i.minus(newerThanDelta, unit);
+        i.minus(delta, unit);
         return streams(i);
     }
 }

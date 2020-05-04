@@ -21,6 +21,14 @@ import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.TableMetadata;
 
+/**
+ * CDC config + factory for a single source table.
+ * 
+ * Provides metadata and factory methods to access cdc log.
+ * 
+ * @author calle
+ *
+ */
 public class LogSession {
     private static final String TABLE_NAME_SUFFIX = "_scylla_cdc_log";
 
@@ -242,6 +250,12 @@ public class LogSession {
         return new Builder(session);
     }
 
+    /**
+     * Configures and builds a {@link LogSession}
+     * 
+     * @author calle
+     *
+     */
     public static class Builder {
         private final Session session;
 
@@ -254,29 +268,46 @@ public class LogSession {
             this.session = session;
         }
 
+        /**
+         * Sets source keyspace
+         */
         public Builder withKeyspace(KeyspaceMetadata keyspace) {
             this.keyspace = keyspace;
             return this;
         }
 
+        /**
+         * @see #withKeyspace(KeyspaceMetadata)
+         */
         public Builder withKeyspace(String keyspace) {
             return withKeyspace(session.getCluster().getMetadata().getKeyspace(keyspace));
         }
 
+        /**
+         * Sets source table
+         */
         public Builder withTable(TableMetadata table) {
             this.table = table;
             return this;
         }
 
+        /** @see #withTable(TableMetadata) */
         public Builder withTable(String table) {
             return withTable(this.keyspace.getTable(table));
         }
 
+        /**
+         * Sets confidence window for CDC log queries. TODO: explain
+         */
         public Builder withStreamPositionWindow(Duration d) {
             this.streamPositionWindow = d;
             return this;
         }
 
+        /**
+         * Sets max streams to query in a single select. I.e. "IN" limit in
+         * cluster.
+         */
         public Builder withMaxStreamsInQuery(int m) {
             maxStreamsInQuery = m;
             return this;

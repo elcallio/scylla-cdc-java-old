@@ -7,6 +7,15 @@ import java.util.Spliterator;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import com.datastax.driver.core.ResultSet;
+
+/**
+ * Pageable result set of CDC {@link Event}s.
+ * 
+ * @see ResultSet
+ * @author calle
+ *
+ */
 public class LogResult {
 
     private StreamPosition next;

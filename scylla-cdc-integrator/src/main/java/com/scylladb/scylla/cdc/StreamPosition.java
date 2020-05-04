@@ -9,19 +9,28 @@ import java.util.UUID;
 
 import com.datastax.driver.core.utils.UUIDs;
 
+/**
+ * Represents a position in a CDC stream.
+ * 
+ * This is designated by the timestamp of the cdc row(s) that make up an
+ * {@link Event}.
+ * 
+ * @author calle
+ *
+ */
 public final class StreamPosition implements Serializable, Comparable<StreamPosition> {
     private static final long serialVersionUID = 6791841858615998893L;
     private final UUID position;
 
-    public StreamPosition(UUID position) {
+    StreamPosition(UUID position) {
         this.position = position;
     }
 
-    public StreamPosition(Event event) {
+    StreamPosition(Event event) {
         this(event.getTimeUUID());
     }
 
-    public StreamPosition(Instant when) {
+    StreamPosition(Instant when) {
         this(UUIDs.startOf(when.toEpochMilli()));
     }
 
