@@ -1,10 +1,12 @@
 package com.scylladb.scylla.cdc;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySortedMap;
+
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.SortedMap;
@@ -25,15 +27,15 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 
 /**
- * Represents the available cdc streams in a scylla cluster. 
+ * Represents the available cdc streams in a scylla cluster.
  * 
- * This includes both active and expired streams. Note that an 
- * expired stream can still receive writes for a short time 
- * after being replaced. Thus one must use a confidence interval
- * in sifting out streams that are considered consumed.  
+ * This includes both active and expired streams. Note that an expired stream
+ * can still receive writes for a short time after being replaced. Thus one must
+ * use a confidence interval in sifting out streams that are considered
+ * consumed.
  * 
  * The stream set is updated on cluster topology changes.
- *  
+ * 
  * @author calle
  *
  */
@@ -45,38 +47,38 @@ public class Streams {
         this.session = session;
         this.statement = session
                 .prepare("SELECT time, description, expired FROM system_distributed.cdc_topology_description");
-        
-        // listen for cluster changes. 
+
+        // listen for cluster changes.
         session.getCluster().register(new Host.StateListener() {
 
             @Override
             public void onUp(Host host) {
-                rebuild();
+                rebuildAndSignal();
             }
 
             @Override
             public void onUnregister(Cluster cluster) {
-                rebuild();
+                rebuildAndSignal();
             }
 
             @Override
             public void onRemove(Host host) {
-                rebuild();
+                rebuildAndSignal();
             }
 
             @Override
             public void onRegister(Cluster cluster) {
-                rebuild();
+                rebuildAndSignal();
             }
 
             @Override
             public void onDown(Host host) {
-                rebuild();
+                rebuildAndSignal();
             }
 
             @Override
             public void onAdd(Host host) {
-                rebuild();
+                rebuildAndSignal();
             }
         });
         try {
@@ -86,7 +88,23 @@ public class Streams {
         }
     }
 
-    private SortedMap<Date, List<Stream>> allStreams = Collections.emptySortedMap();
+    public static interface StateListener {
+        void onRebuild(Streams streams);
+    }
+
+    public synchronized void addListener(StateListener listener) {
+        List<StateListener> result = new ArrayList<>(listeners);
+        result.add(listener);
+        listeners = result;
+    }
+
+    private void rebuildAndSignal() {
+        rebuild();
+        this.listeners.stream().forEach((l) -> l.onRebuild(this));
+    }
+
+    private List<StateListener> listeners = emptyList();
+    private SortedMap<Date, List<Stream>> allStreams = emptySortedMap();
 
     private Future<Void> rebuild() {
         final CompletableFuture<Void> f = new CompletableFuture<>();
@@ -133,10 +151,10 @@ public class Streams {
     }
 
     /**
-     * Sift out streams that has not expired prior to the 
-     * threshold time. 
-     *  
-     * @param threshold - watermark timestamp
+     * Sift out streams that has not expired prior to the threshold time.
+     * 
+     * @param threshold
+     *            - watermark timestamp
      * @return a list of streams (in ascending creation order)
      */
     public List<? extends Stream> streams(Date threshold) {
@@ -153,9 +171,10 @@ public class Streams {
     }
 
     /**
-     * All streams since the beginning of time 
-     *  
-     * @param threshold - watermark timestamp
+     * All streams since the beginning of time
+     * 
+     * @param threshold
+     *            - watermark timestamp
      * @return a list of streams (in ascending creation order)
      */
     public List<? extends Stream> streams() {
@@ -173,11 +192,13 @@ public class Streams {
     }
 
     /**
-     * Sift out streams that has not expired prior to <code>delta</code>
-     * units of time before now (wall clock) 
-     *  
-     * @param delta time units before now
-     * @param unit unit designator
+     * Sift out streams that has not expired prior to <code>delta</code> units
+     * of time before now (wall clock)
+     * 
+     * @param delta
+     *            time units before now
+     * @param unit
+     *            unit designator
      * @return a list of streams (in ascending creation order)
      */
     public List<? extends Stream> streams(long delta, TemporalUnit unit) {
