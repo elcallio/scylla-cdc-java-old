@@ -79,7 +79,7 @@ public class Reader {
     public CompletableFuture<LogResult> readStreams(Collection<Stream> streams, StreamPosition pos,
             StreamPosition limit) {
         if (limit.compareTo(pos) <= 0) {
-            return CompletableFuture.completedFuture(new LogResult(Spliterators.emptySpliterator()));
+            return CompletableFuture.completedFuture(new LogResult(Spliterators.emptySpliterator(), pos));
         }
 
         BoundStatement statement = readEntries.bind(pos.getPosition(), limit.getPosition());
@@ -91,7 +91,7 @@ public class Reader {
         addCallback(session.executeAsync(statement), new FutureCallback<ResultSet>() {
             @Override
             public void onSuccess(ResultSet result) {
-                res.complete(new LogResult(new LogSpliterator(logSession, result)));
+                res.complete(new LogResult(new LogSpliterator(logSession, result), limit));
             }
 
             @Override

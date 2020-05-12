@@ -17,13 +17,13 @@ import com.datastax.driver.core.ResultSet;
  *
  */
 public class LogResult {
-
-    private StreamPosition next;
-    private Spliterator<Event> events;
+    private final StreamPosition next;
+    private final Spliterator<Event> events;
     private Event event;
 
-    LogResult(Spliterator<Event> events) {
+    LogResult(Spliterator<Event> events, StreamPosition next) {
         this.events = events;
+        this.next = next;
     }
 
     public Event one() {
